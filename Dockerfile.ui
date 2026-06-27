@@ -1,0 +1,32 @@
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    STREAMLIT_SERVER_HEADLESS=true \
+    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
+    STREAMLIT_SERVER_PORT=8501
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       curl \
+       libexpat1 \
+       libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml README_PRODUCTION.md ./
+COPY src ./src
+COPY streamlit_ui ./streamlit_ui
+
+RUN pip install --upgrade pip \
+    && pip install '.[ui]'
+
+RUN useradd --create-home --uid 10001 appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8501
+HEALTHCHECK --interval=20s --timeout=5s --retries=5 CMD curl -fsS http://localhost:8501/_stcore/health || exit 1
+
+CMD ["streamlit", "run", "streamlit_ui/app.py"]

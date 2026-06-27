@@ -54,3 +54,18 @@ The default stack uses `GEO_LLM_PROVIDER=mock` and `GEE_REAL_EXECUTION=false`, s
 ## Built-in chat UI
 
 After starting Docker Compose, open http://localhost:8080/chat. The UI is served by the API container and calls `/runs` and `/runs/{run_id}/resume`; no host-side Node, Streamlit, or Python install is required.
+
+## Optional Streamlit UI
+
+Start the Streamlit chat and map viewer:
+
+```bash
+docker compose --profile ui up -d --build
+```
+
+Open `http://localhost:8501`.
+
+The UI is fully containerized and requires no host Python/Node installation. It calls the production
+API at `http://geollm-api:8080`, stores chat history in Streamlit session state, shows generated JSON
+instructions from the current session, and renders real GeoTIFF artifacts from the shared `/gee_out`
+volume when available.

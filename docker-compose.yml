@@ -68,6 +68,26 @@ services:
       timeout: 5s
       retries: 10
 
+  streamlit-ui:
+    profiles: ["ui"]
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: llm-geoprocessing-streamlit:prod
+    env_file: .env
+    environment:
+      GEOLLM_API_URL: http://geollm-api:8080
+      STREAMLIT_API_TIMEOUT_SECONDS: ${STREAMLIT_API_TIMEOUT_SECONDS:-900}
+    ports:
+      - "8501:8501"
+    volumes:
+      - gee_out:/gee_out:ro
+    depends_on:
+      geollm-api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
   geollm-mcp-gee:
     profiles: ["mcp"]
     image: llm-geoprocessing-api:prod
