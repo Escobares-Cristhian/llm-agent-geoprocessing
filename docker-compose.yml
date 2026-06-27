@@ -1,0 +1,97 @@
+services:
+  geollm-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: llm-geoprocessing-api:prod
+    env_file: .env
+    environment:
+      GEE_PLUGIN_URL: http://gee-plugin-api:8000
+      POSTGIS_HOST: postgis
+      ARTIFACT_BASE_DIR: /gee_out
+    ports:
+      - "8080:8080"
+    volumes:
+      - gee_out:/gee_out
+    depends_on:
+      postgis:
+        condition: service_healthy
+      gee-plugin-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  gee-plugin-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: llm-geoprocessing-api:prod
+    command: ["uvicorn", "llm_geoprocessing.plugins.gee.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: .env
+    environment:
+      ARTIFACT_BASE_DIR: /gee_out
+    ports:
+      - "8000:8000"
+    volumes:
+      - gee_out:/gee_out
+    secrets:
+      - source: gee_sa_json
+        target: gee_sa_json
+        mode: 0400
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  postgis:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geollm}
+      POSTGRES_USER: ${POSTGRES_USER:-geollm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-prod}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-geollm} -d $${POSTGRES_DB:-geollm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  geollm-mcp-gee:
+    profiles: ["mcp"]
+    image: llm-geoprocessing-api:prod
+    command: ["python", "-m", "llm_geoprocessing.mcp.gee_server"]
+    env_file: .env
+    depends_on:
+      gee-plugin-api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+volumes:
+  postgis_data:
+  gee_out:
+  ollama_data:
+
+secrets:
+  gee_sa_json:
+    file: ./secrets/gee-sa.json

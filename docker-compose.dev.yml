@@ -1,0 +1,41 @@
+services:
+  geollm-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: llm-geoprocessing-api:dev
+    env_file: .env
+    command: ["uvicorn", "llm_geoprocessing.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - gee_out:/gee_out
+    depends_on:
+      - postgis
+      - gee-plugin-api
+
+  gee-plugin-api:
+    image: llm-geoprocessing-api:dev
+    command: ["uvicorn", "llm_geoprocessing.plugins.gee.api:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - gee_out:/gee_out
+
+  postgis:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geollm}
+      POSTGRES_USER: ${POSTGRES_USER:-geollm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-prod}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+
+volumes:
+  postgis_data:
+  gee_out:

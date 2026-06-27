@@ -1,12 +1,28 @@
-X11 := xhost +local: # Only if using GUI with X11
-COMPOSE := docker compose -f docker/compose.dev.yaml
+.PHONY: up down logs test lint typecheck format api shell
 
-LOG_ENV :=
-ifneq ($(strip $(log_level)),)
-LOG_ENV := --env GEOLLM_LOG_LEVEL=$(log_level)
-endif
+up:
+	docker compose up --build
 
-.PHONY: run
-run:
-	$(X11)
-	$(COMPOSE) run --rm --build $(LOG_ENV) geollm python -m llm_geoprocessing.app.main
+down:
+	docker compose down
+
+logs:
+	docker compose logs -f --tail=200
+
+test:
+	docker compose run --rm geollm-api pytest
+
+lint:
+	docker compose run --rm geollm-api ruff check .
+
+typecheck:
+	docker compose run --rm geollm-api mypy src
+
+format:
+	docker compose run --rm geollm-api ruff format .
+
+api:
+	docker compose up --build geollm-api gee-plugin-api postgis
+
+shell:
+	docker compose run --rm geollm-api bash
