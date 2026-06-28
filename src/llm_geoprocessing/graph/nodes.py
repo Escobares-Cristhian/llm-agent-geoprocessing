@@ -294,20 +294,36 @@ async def execute_tools(state: AgentState, settings: Settings | None = None) -> 
         }
 
     client = GeeToolClient(settings)
+    products_by_id = {product.id: product for product in plan.products}
     action_results: list[ActionResult] = []
     artifacts = []
     for action in plan.actions:
+        action_to_execute = action
+        product_id = action.input_json.get("product_id")
+        if isinstance(product_id, str) and product_id in products_by_id:
+            product = products_by_id[product_id]
+            hydrated_input = dict(action.input_json)
+            # Keep the LLM-facing product reference while adding the concrete
+            # Earth Engine collection id required by the plugin boundary.
+            hydrated_input.setdefault("product", product.name)
+            hydrated_input.setdefault("product_name", product.name)
+            hydrated_input.setdefault("date_initial", product.date.initial_date.isoformat())
+            hydrated_input.setdefault("date_end", product.date.end_date.isoformat())
+            hydrated_input.setdefault("projection", product.proj)
+            hydrated_input.setdefault("resolution", product.res)
+            action_to_execute = action.model_copy(update={"input_json": hydrated_input})
+
         try:
-            tool_response = await client.execute(action)
+            tool_response = await client.execute(action_to_execute)
             action_result = ActionResult(
-                action=action,
+                action=action_to_execute,
                 status=ActionStatus.SUCCEEDED,
                 artifacts=tool_response.artifacts,
             )
             artifacts.extend(tool_response.artifacts)
         except GeoLLMError as exc:
             action_result = ActionResult(
-                action=action,
+                action=action_to_execute,
                 status=ActionStatus.FAILED,
                 error=exc.to_dict(),
             )

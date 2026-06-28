@@ -42,7 +42,7 @@ services:
     secrets:
       - source: gee_sa_json
         target: gee_sa_json
-        mode: 0400
+        mode: 0444
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
       interval: 20s
